@@ -72,6 +72,10 @@ module Unified
           opts[:session] = entities.get(:session, session)
         end
 
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
+        end
+
         database.list_collections(**opts.merge(name_only: name_only))
       end
     end
