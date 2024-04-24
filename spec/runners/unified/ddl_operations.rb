@@ -20,6 +20,9 @@ module Unified
         if session = args.use('session')
           opts[:session] = entities.get(:session, session)
         end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
+        end
         client.list_databases(args.use('filter') || {}, name_only, **opts)
       end
     end

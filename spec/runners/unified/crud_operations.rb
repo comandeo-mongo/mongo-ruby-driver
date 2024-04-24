@@ -194,6 +194,7 @@ module Unified
           comment: args.use('comment'),
           hint: args.use('hint'),
           upsert: args.use('upsert'),
+          timeout_ms: args.use('timeoutMS'),
         }
         if session = args.use('session')
           opts[:session] = entities.get(:session, session)
@@ -209,6 +210,7 @@ module Unified
           let: args.use('let'),
           comment: args.use('comment'),
           hint: args.use('hint'),
+          timeout_ms: args.use('timeoutMS'),
         }
         collection.update_many(args.use!('filter'), args.use!('update'), **opts)
       end
@@ -224,7 +226,7 @@ module Unified
           upsert: args.use('upsert'),
           let: args.use('let'),
           hint: args.use('hint'),
-          timeout_ms: args.use('timeout_ms')
+          timeout_ms: args.use('timeoutMS')
         )
       end
     end
@@ -239,6 +241,9 @@ module Unified
         }
         if session = args.use('session')
           opts[:session] = entities.get(:session, session)
+        end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
         end
         collection.delete_one(args.use!('filter'), **opts)
       end
@@ -290,6 +295,10 @@ module Unified
 
       if session = args.use('session')
         opts[:session] = entities.get(:session, session)
+      end
+
+      if timeout_ms = args.use('timeoutMS')
+        opts[:timeout_ms] = timeout_ms
       end
 
       unless args.empty?
