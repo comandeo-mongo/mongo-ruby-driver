@@ -47,6 +47,23 @@ module Unified
       end
     end
 
+    def count(op)
+      collection = entities.get(:collection, op.use!('object'))
+      use_arguments(op) do |args|
+        opts = {}
+        if session = args.use('session')
+          opts[:session] = entities.get(:session, session)
+        end
+        if comment = args.use('comment')
+          opts[:comment] = comment
+        end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
+        end
+        collection.count(args.use!('filter'), **opts)
+      end
+    end
+
     def count_documents(op)
       collection = entities.get(:collection, op.use!('object'))
       use_arguments(op) do |args|
@@ -56,6 +73,9 @@ module Unified
         end
         if comment = args.use('comment')
           opts[:comment] = comment
+        end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
         end
         collection.find(args.use!('filter')).count_documents(**opts)
       end
@@ -71,6 +91,9 @@ module Unified
         if comment = args.use('comment')
           opts[:comment] = comment
         end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
+        end
         collection.estimated_document_count(**opts)
       end
     end
@@ -84,6 +107,9 @@ module Unified
         end
         if comment = args.use('comment')
           opts[:comment] = comment
+        end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
         end
         req = collection.find(args.use!('filter'), **opts).distinct(args.use!('fieldName'), **opts)
         result = req.to_a

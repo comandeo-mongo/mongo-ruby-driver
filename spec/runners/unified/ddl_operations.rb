@@ -137,6 +137,9 @@ module Unified
         if session = args.use('session')
           opts[:session] = entities.get(:session, session)
         end
+        if timeout_ms = args.use('timeoutMS')
+          opts[:timeout_ms] = timeout_ms
+        end
         collection.indexes(**opts).to_a
       end
     end
