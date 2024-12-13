@@ -15,12 +15,15 @@
 # limitations under the License.
 
 module Mongo
-  class Monitoring
-    # @api private
-    module OpenTelemetry
+  # Container class for OpenTelemetry functionality.
+  #
+  # @api private
+  class OpenTelemetry
+    def self.tracer
+      @tracer ||= Tracer.new
     end
   end
 end
 
-require 'mongo/monitoring/open_telemetry/statement_builder'
-require 'mongo/monitoring/open_telemetry/tracer'
+require 'mongo/open_telemetry/statement_builder'
+require 'mongo/open_telemetry/tracer'
