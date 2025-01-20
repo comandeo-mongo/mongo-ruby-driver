@@ -41,36 +41,6 @@ module Mongo
         )
       end
 
-      def trace_message(command, address, &block)
-        in_span(span_name(command), build_attributes(command, address), &block)
-      end
-
-      def add_query_text(span, message)
-        return unless span && query_text?
-
-        span.add_attributes(
-          'db.query.text' => StatementBuilder.new(message.payload[:command]).build
-        )
-      end
-
-      # @param [ OpenTelemetry::Trace::Span | nil ] span
-      # @param [ Mongo::Operation::Result ] result
-      def add_attributes_from_result(span, result)
-        return if span.nil?
-
-        if result.successful?
-          if (cursor_id = result.cursor_id).positive?
-            span.add_attributes(
-              'db.mongodb.cursor_id' => cursor_id
-            )
-          end
-        else
-          span.record_exception(result.error)
-        end
-      end
-
-      private
-
       def in_span(name, attributes = {}, &block)
         if enabled?
           @ot_tracer.in_span(name, attributes: attributes, kind: :client, &block)
@@ -78,6 +48,44 @@ module Mongo
           yield
         end
       end
+
+      def add_attributes_from_command(span, command, address)
+        return unless enabled?
+
+        span&.add_attributes(build_attributes(command, address))
+      end
+
+      def add_query_text(span, message)
+        return unless enabled? && query_text?
+
+        span&.add_attributes(
+          'db.query.text' => StatementBuilder.new(message.payload[:command]).build
+        )
+      end
+
+      # @param [ OpenTelemetry::Trace::Span | nil ] span
+      # @param [ Mongo::Operation::Result ] result
+      def add_attributes_from_result(span, result)
+        return unless enabled?
+
+        if result.successful?
+          if (cursor_id = result.cursor_id).positive?
+            span&.add_attributes(
+              'db.mongodb.cursor_id' => cursor_id
+            )
+          end
+        else
+          span&.record_exception(result.error)
+        end
+      end
+
+      def add_event(span, name, attributes = nil)
+        return unless enabled?
+
+        span&.add_event(name, attributes: attributes)
+      end
+
+      private
 
       # @return [ true, false ] Whether otel instrumentation is enabled.
       def enabled?
@@ -103,28 +111,18 @@ module Mongo
       def build_attributes(command, address)
         command_name = command.keys.first
         {
-          'db.system' => 'mongodb',
-          'db.namespace' => command['$db'],
-          'db.operation.name' => command_name,
           'server.port' => address.port,
           'net.peer.port' => address.port,
           'server.address' => address.host,
           'net.peer.address' => address.host,
-          'db.query.summary' => span_name(command)
         }.tap do |attributes|
-          if (coll_name = collection_name(command))
-            attributes['db.collection.name'] = coll_name
-          end
           if command_name == 'getMore'
             attributes['db.mongodb.cursor_id'] = command[command_name].value
           end
         end
       end
-
-      # @return [ String | nil] Name of collection the operation is executed on.
-      def collection_name(command)
-        command.values.first if command.values.first.is_a?(String)
-      end
     end
   end
 end
+
+# ```

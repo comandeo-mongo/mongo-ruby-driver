@@ -32,7 +32,7 @@ module Mongo
       #   execute this operation.
       attr_accessor :context
 
-      def do_execute(connection, context, span, options = {})
+      def do_execute(connection, context, options = {})
         # Save the context on the instance, to avoid having to pass it as a
         # parameter to every single method. There are many legacy methods that
         # still accept it as a parameter, which are left as-is for now to
@@ -44,7 +44,7 @@ module Mongo
           add_error_labels(connection, context) do
             check_for_network_error do
               add_server_diagnostics(connection) do
-                get_result(connection, context, span, options).tap do |result|
+                get_result(connection, context, options).tap do |result|
                   if session
                     if session.in_transaction? &&
                       connection.description.load_balancer?
@@ -92,11 +92,10 @@ module Mongo
         end
 
         session&.materialize_if_needed
-        context.tracer.trace_message(command(connection), connection.address) do |span|
-          do_execute(connection, context, span, options).tap do |result|
-            context.tracer.add_attributes_from_result(span, result)
-            validate_result(result, connection, context)
-          end
+        context.tracer.add_attributes_from_command(context.current_span, command(connection), connection.address)
+        do_execute(connection, context, options).tap do |result|
+          context.tracer.add_attributes_from_result(context.current_span, result)
+          validate_result(result, connection, context)
         end
       end
 
@@ -106,15 +105,15 @@ module Mongo
         Result
       end
 
-      def get_result(connection, context, span, options = {})
-        result_class.new(*dispatch_message(connection, context, span, options), context: context, connection: connection)
+      def get_result(connection, context, options = {})
+        result_class.new(*dispatch_message(connection, context, options), context: context, connection: connection)
       end
 
       # Returns a Protocol::Message or nil as reply.
-      def dispatch_message(connection, context, span, options = {})
+      def dispatch_message(connection, context, options = {})
         message = build_message(connection, context)
         message = message.maybe_encrypt(connection, context)
-        context.tracer.add_query_text(span, message)
+        context.tracer.add_query_text(context.current_span, message)
         reply = connection.dispatch([ message ], context, options)
         [reply, connection.description, connection.global_id]
       end

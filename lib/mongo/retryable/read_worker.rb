@@ -202,6 +202,7 @@ module Mongo
           session,
           timeout: context&.remaining_timeout_sec
         )
+        context&.tracer&.add_event(context&.current_span, 'Server Selected')
         yield server
       rescue *retryable_exceptions, Error::OperationFailure::Family, Auth::Unauthorized, Error::PoolError => e
         e.add_notes('modern retry', 'attempt 1')

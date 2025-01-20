@@ -88,20 +88,34 @@ module Mongo
             operation_timeouts: operation_timeouts,
             view: self
           )
+          op = initial_query_op(session)
+          operation_name = op.is_a?(Mongo::Operation::Find) ? 'find' : 'explain'
+          attrs = {
+            'db.system' => 'mongodb',
+            'db.namespace' => op.spec[:db_name],
+            'db.collection.name' => op.spec[:coll_name],
+            'db.operation.name' => operation_name,
+            'db.query.summary' => "#{op.spec[:coll_name]}.#{operation_name}"
+          }
+          context.tracer.in_span("#{op.spec[:coll_name]}.#{operation_name}", attrs) do |span|
+            context.current_span = span
+            if respond_to?(:write?, true) && write?
+              server = server_selector.select_server(cluster, nil, session, write_aggregation: true)
+              context.tracer.add_event(span, 'server selected', {})
+              result = send_initial_query(server, context)
 
-          if respond_to?(:write?, true) && write?
-            server = server_selector.select_server(cluster, nil, session, write_aggregation: true)
-            result = send_initial_query(server, context)
-
-            if use_query_cache?
-              CachingCursor.new(view, result, server, session: session, context: context)
+              if use_query_cache?
+                CachingCursor.new(view, result, server, session: session, context: context)
+              else
+                Cursor.new(view, result, server, session: session, context: context)
+              end
             else
-              Cursor.new(view, result, server, session: session, context: context)
+              read_with_retry_cursor(session, server_selector, view, context: context) do |server|
+                send_initial_query(server, context)
+              end
             end
-          else
-            read_with_retry_cursor(session, server_selector, view, context: context) do |server|
-              send_initial_query(server, context)
-            end
+          ensure
+            context.current_span = nil
           end
         end
 
