@@ -21,6 +21,28 @@ module Mongo
       Tracer.instance
     end
     module_function :tracer
+
+    def set_current(span, context)
+      Thread.current['mongo-ruby-driver-otel-span'] = span
+      Thread.current['mongo-ruby-driver-otel-context'] = context
+    end
+    module_function :set_current
+
+    def current_span
+      Thread.current['mongo-ruby-driver-otel-span']
+    end
+    module_function :current_span
+
+    def current_context
+      Thread.current['mongo-ruby-driver-otel-context']
+    end
+    module_function :current_context
+
+    def clear_current
+      Thread.current['mongo-ruby-driver-otel-context'] = nil
+      Thread.current['mongo-ruby-driver-otel-span'] = nil
+    end
+    module_function :clear_current
   end
 end
 
