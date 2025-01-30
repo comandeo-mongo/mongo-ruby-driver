@@ -92,10 +92,14 @@ module Mongo
         end
 
         session&.materialize_if_needed
-        context.tracer.add_attributes_from_command(context.current_span, command(connection), connection.address)
-        do_execute(connection, context, options).tap do |result|
-          context.tracer.add_attributes_from_result(context.current_span, result)
-          validate_result(result, connection, context)
+        begin
+          span = context.tracer.start_span(command(connection), connection.address, context.current_context)
+          do_execute(connection, context, options).tap do |result|
+            context.tracer.add_attributes_from_result(span, result)
+            validate_result(result, connection, context)
+          end
+        ensure
+          span&.finish
         end
       end
 

@@ -94,14 +94,14 @@ module Mongo
             'db.system' => 'mongodb',
             'db.namespace' => op.spec[:db_name],
             'db.collection.name' => op.spec[:coll_name],
-            'db.operation.name' => operation_name,
-            'db.query.summary' => "#{op.spec[:coll_name]}.#{operation_name}"
+            'db.operation.name' => 'find',
+            'db.operation.summary' => "find #{op.spec[:coll_name]}"
           }
-          context.tracer.in_span("#{op.spec[:coll_name]}.#{operation_name}", attrs) do |span|
+          context.tracer.in_span("find #{op.spec[:coll_name]}", attrs) do |span, ctx|
             context.current_span = span
+            context.current_context = ctx
             if respond_to?(:write?, true) && write?
               server = server_selector.select_server(cluster, nil, session, write_aggregation: true)
-              context.tracer.add_event(span, 'server selected', {})
               result = send_initial_query(server, context)
 
               if use_query_cache?
@@ -116,6 +116,7 @@ module Mongo
             end
           ensure
             context.current_span = nil
+            context.current_context = nil
           end
         end
 

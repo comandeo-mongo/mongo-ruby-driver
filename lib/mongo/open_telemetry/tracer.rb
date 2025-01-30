@@ -41,6 +41,17 @@ module Mongo
         )
       end
 
+      def start_span(command, address, parent)
+        if enabled?
+          attributes = build_attributes(command, address)
+          @ot_tracer.start_span(
+            span_name(command),
+            with_parent: parent,
+            attributes: attributes
+          )
+        end
+      end
+
       def in_span(name, attributes = {}, &block)
         if enabled?
           @ot_tracer.in_span(name, attributes: attributes, kind: :client, &block)
@@ -79,10 +90,7 @@ module Mongo
         end
       end
 
-      def add_event(span, name, attributes = nil)
-        return unless enabled?
-
-        span&.add_event(name, attributes: attributes)
+      def add_event(span, name, attributes = {})
       end
 
       private
@@ -111,18 +119,28 @@ module Mongo
       def build_attributes(command, address)
         command_name = command.keys.first
         {
+          'db.system' => 'mongodb',
+          'db.namespace' => command['$db'],
+          'db.command.name' => command_name,
           'server.port' => address.port,
           'net.peer.port' => address.port,
           'server.address' => address.host,
           'net.peer.address' => address.host,
+          'db.query.summary' => span_name(command)
         }.tap do |attributes|
+          if (coll_name = collection_name(command))
+            attributes['db.collection.name'] = coll_name
+          end
           if command_name == 'getMore'
             attributes['db.mongodb.cursor_id'] = command[command_name].value
           end
         end
       end
+
+      # @return [ String | nil] Name of collection the operation is executed on.
+      def collection_name(command)
+        command.values.first if command.values.first.is_a?(String)
+      end
     end
   end
 end
-
-# ```

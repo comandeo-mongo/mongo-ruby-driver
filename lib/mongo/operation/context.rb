@@ -73,7 +73,7 @@ module Mongo
       attr_reader :options
       attr_reader :tracer
 
-      attr_accessor :current_span
+      attr_accessor :current_span, :current_context
 
       # Returns a new Operation::Context with the deadline refreshed
       # and relative to the current moment.
