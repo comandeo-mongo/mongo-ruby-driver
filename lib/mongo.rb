@@ -79,6 +79,7 @@ require 'mongo/version'
 require 'mongo/write_concern'
 require 'mongo/utils'
 require 'mongo/config'
+require 'mongo/open_telemetry'
 
 module Mongo
 
