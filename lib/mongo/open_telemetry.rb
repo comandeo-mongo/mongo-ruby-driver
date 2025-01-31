@@ -46,5 +46,6 @@ module Mongo
   end
 end
 
+require 'mongo/open_telemetry/command_span_builder'
 require 'mongo/open_telemetry/operation_span_builder'
 require 'mongo/open_telemetry/tracer'

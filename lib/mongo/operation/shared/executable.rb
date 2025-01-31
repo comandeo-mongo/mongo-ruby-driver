@@ -104,7 +104,14 @@ module Mongo
       end
 
       def get_result(connection, context, options = {})
-        result_class.new(*dispatch_message(connection, context, options), context: context, connection: connection)
+        builder = OpenTelemetry::CommandSpanBuilder.new
+        span_name, span_attrs = builder.build(command(connection), connection.address)
+        span = OpenTelemetry.tracer.start_span(span_name, attributes: span_attrs, with_parent: OpenTelemetry.current_context)
+        result_class.new(*dispatch_message(connection, context, options), context: context, connection: connection).tap do |result|
+          builder.add_attributes_from_result(span, result)
+        end
+      ensure
+        span&.finish
       end
 
       # Returns a Protocol::Message or nil as reply.

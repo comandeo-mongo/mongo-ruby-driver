@@ -47,7 +47,12 @@ module Mongo
       # @param [ Hash ] attributes Span attributes.
       def in_span(name, attributes: {}, &block)
         if enabled?
-          @ot_tracer.in_span(name, attributes: attributes, kind: :client, &block)
+          @ot_tracer.in_span(name, attributes: attributes, kind: :client) do |span, context|
+            OpenTelemetry.set_current(span, context)
+            yield(span, context) if block_given?
+          ensure
+            OpenTelemetry.clear_current
+          end
         else
           yield
         end

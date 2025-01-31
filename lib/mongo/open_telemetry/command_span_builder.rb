@@ -22,6 +22,22 @@ module Mongo
         [ span_name(command), build_attributes(command, address) ]
       end
 
+      # @param [ OpenTelemetry::Trace::Span | nil ] span
+      # @param [ Mongo::Operation::Result ] result
+      def add_attributes_from_result(span, result)
+        return if span.nil?
+
+        if result.successful?
+          if (cursor_id = result.cursor_id).positive?
+            span.add_attributes(
+              'db.mongodb.cursor_id' => cursor_id
+            )
+          end
+        else
+          span.record_exception(result.error)
+        end
+      end
+
       private
 
       def span_name(command)

@@ -513,11 +513,15 @@ module Mongo
     end
 
     def execute_operation(op, context: nil)
-      op_context = context || possibly_refreshed_context
-      if @connection.nil?
-        op.execute(@server, context: op_context)
-      else
-        op.execute_with_connection(@connection, context: op_context)
+      builder = OpenTelemetry::OperationSpanBuilder.new
+      span_name, span_attrs = builder.build('getMore', op)
+      OpenTelemetry.tracer.in_span(span_name, attributes: span_attrs) do |_span, _context|
+        op_context = context || possibly_refreshed_context
+        if @connection.nil?
+          op.execute(@server, context: op_context)
+        else
+          op.execute_with_connection(@connection, context: op_context)
+        end
       end
     end
 
