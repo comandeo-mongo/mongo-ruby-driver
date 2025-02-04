@@ -25,6 +25,13 @@ module Mongo
       # @since 2.0.0
       # @api semiprivate
       class Result < Operation::Result
+        def has_cursor_id?
+          if cursor_document && cursor_document.key?(CURSOR_ID)
+            true
+          else
+            super
+          end
+        end
 
         # Get the cursor id for the result.
         #
@@ -102,4 +109,3 @@ module Mongo
     end
   end
 end
-

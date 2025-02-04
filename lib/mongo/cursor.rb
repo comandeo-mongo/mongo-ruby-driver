@@ -514,7 +514,7 @@ module Mongo
 
     def execute_operation(op, context: nil)
       builder = OpenTelemetry::OperationSpanBuilder.new
-      span_name, span_attrs = builder.build('getMore', op)
+      span_name, span_attrs = builder.build('getMore', op, context)
       OpenTelemetry.tracer.in_span(span_name, attributes: span_attrs) do |_span, _context|
         op_context = context || possibly_refreshed_context
         if @connection.nil?

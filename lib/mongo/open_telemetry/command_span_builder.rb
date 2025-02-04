@@ -17,25 +17,19 @@
 module Mongo
   module OpenTelemetry
     class CommandSpanBuilder
+      include OpenTelemetry::Shared
 
       def build(command, address)
         [ span_name(command), build_attributes(command, address) ]
       end
 
-      # @param [ OpenTelemetry::Trace::Span | nil ] span
-      # @param [ Mongo::Operation::Result ] result
-      def add_attributes_from_result(span, result)
+      def add_query_text(span, message)
         return if span.nil?
 
-        if result.successful?
-          if (cursor_id = result.cursor_id).positive?
-            span.add_attributes(
-              'db.mongodb.cursor_id' => cursor_id
-            )
-          end
-        else
-          span.record_exception(result.error)
-        end
+        query_text = mask(message.payload[:command])
+        span.add_attributes(
+          'db.query.text' => query_text.as_extended_json.to_s
+        ) unless query_text.empty?
       end
 
       private
@@ -75,6 +69,16 @@ module Mongo
       # @return [ String | nil] Name of collection the operation is executed on.
       def collection_name(command)
         command.values.first if command.values.first.is_a?(String)
+      end
+
+      private
+
+      def statement(command)
+        mask(command)
+      end
+
+      def mask(hash)
+        hash.reject { |k, v| Mongo::Protocol::Msg::INTERNAL_KEYS.include?(k.to_s) }
       end
     end
   end

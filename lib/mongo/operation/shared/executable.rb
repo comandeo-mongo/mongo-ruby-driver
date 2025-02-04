@@ -107,7 +107,9 @@ module Mongo
         builder = OpenTelemetry::CommandSpanBuilder.new
         span_name, span_attrs = builder.build(command(connection), connection.address)
         span = OpenTelemetry.tracer.start_span(span_name, attributes: span_attrs, with_parent: OpenTelemetry.current_context)
-        result_class.new(*dispatch_message(connection, context, options), context: context, connection: connection).tap do |result|
+        message = build_message(connection, context)
+        builder.add_query_text(span, message) if OpenTelemetry.tracer.query_text?
+        result_class.new(*dispatch_message(message, connection, context, options), context: context, connection: connection).tap do |result|
           builder.add_attributes_from_result(span, result)
         end
       ensure
@@ -115,8 +117,7 @@ module Mongo
       end
 
       # Returns a Protocol::Message or nil as reply.
-      def dispatch_message(connection, context, options = {})
-        message = build_message(connection, context)
+      def dispatch_message(message, connection, context, options = {})
         message = message.maybe_encrypt(connection, context)
         reply = connection.dispatch([ message ], context, options)
         [reply, connection.description, connection.global_id]
@@ -127,7 +128,7 @@ module Mongo
       # @param [ Mongo::Operation::Context ] context The operation context.
       def build_message(connection, context)
         msg = message(connection)
-        if server_api = context.server_api
+        if ( server_api = context.server_api )
           msg = msg.maybe_add_server_api(server_api)
         end
         msg

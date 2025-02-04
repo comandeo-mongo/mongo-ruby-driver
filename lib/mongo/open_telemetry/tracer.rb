@@ -67,8 +67,6 @@ module Mongo
         @ot_tracer.start_span(name, with_parent: with_parent, attributes: attributes, &block)
       end
 
-      private
-
       # @return [ Boolean ] whether OpenTelemetry tracing is enabled.
       def enabled?
         @ot_tracer != nil
