@@ -16,10 +16,10 @@
 
 module Mongo
   module OpenTelemetry
-    class OperationSpanBuilder
+    class MethodSpanBuilder
       include OpenTelemetry::Shared
 
-      def build(name, operation, context)
+      def build(name, db, collection)
         [
           build_span_name(name, operation),
           build_span_attrs(name, operation, context)
@@ -28,21 +28,21 @@ module Mongo
 
       private
 
-      def build_span_name(op_name, op)
-        if (coll_name = op.spec[:coll_name])
-          "#{op_name} #{op.spec[:db_name]}.#{coll_name}"
+      def build_span_name(name, db, collection)
+        if (collection)
+          "#{name} #{db}.#{collection}"
         else
-          op_name
+          name
         end
       end
 
-      def build_span_attrs(op_name, op, op_context)
+      def build_span_attrs(name, db, collection)
         {
           'db.system' => 'mongodb',
-          'db.namespace' => op.spec[:db_name],
-          'db.collection.name' => op.spec[:coll_name],
-          'db.operation.name' => op_name,
-          'db.operation.summary' => build_span_name(op_name, op)
+          'db.namespace' => db,
+          'db.collection.name' => collection,
+          'db.operation.name' => name,
+          'db.operation.summary' => build_span_name(name, db, collection)
         }
       end
     end

@@ -121,22 +121,28 @@ module Mongo
           if server.load_balancer?
             # Connection will be checked in when cursor is drained.
             connection = server.pool.check_out(context: context)
-            initial_query_op(
+            op = initial_query_op(
               context.session,
               effective_read_preference(connection)
-            ).execute_with_connection(
-              connection,
-              context: context
             )
-          else
-            server.with_connection do |connection|
-              initial_query_op(
-                context.session,
-                effective_read_preference(connection)
-              ).execute_with_connection(
+            OpenTelemetry.trace_operation(op, context) do
+              op.execute_with_connection(
                 connection,
                 context: context
               )
+            end
+          else
+            server.with_connection do |connection|
+              op = initial_query_op(
+                context.session,
+                effective_read_preference(connection)
+              )
+              OpenTelemetry.trace_operation(op, context) do
+                op.execute_with_connection(
+                  connection,
+                  context: context
+                )
+              end
             end
           end
         end

@@ -169,18 +169,14 @@ module Mongo
 
         def send_initial_query(server, context)
           operation = initial_query_op(context.session)
-          builder = OpenTelemetry::OperationSpanBuilder.new
-          span_name, span_attrs = builder.build('find', operation, context)
-          OpenTelemetry.tracer.in_span(span_name, attributes: span_attrs) do |span, _context|
+          OpenTelemetry.trace_operation(operation, context) do
             if server.load_balancer?
               # Connection will be checked in when cursor is drained.
               connection = server.pool.check_out(context: context)
-              result = operation.execute_with_connection(connection, context: context)
+              operation.execute_with_connection(connection, context: context)
             else
-              result = operation.execute(server, context: context)
+              operation.execute(server, context: context)
             end
-            builder.add_attributes_from_result(span, result)
-            result
           end
         end
 

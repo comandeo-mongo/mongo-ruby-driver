@@ -453,25 +453,27 @@ module Mongo
     # @since 2.0.0
     def drop(opts = {})
       client.with_session(opts) do |session|
-        maybe_drop_emm_collections(opts[:encrypted_fields], client, session) do
-          temp_write_concern = write_concern
-          write_concern = if opts[:write_concern]
-            WriteConcern.get(opts[:write_concern])
-          else
-            temp_write_concern
-          end
-          context = Operation::Context.new(
+        context = Operation::Context.new(
             client: client,
             session: session,
             operation_timeouts: operation_timeouts(opts)
           )
-          operation = Operation::Drop.new({
+        temp_write_concern = write_concern
+            write_concern = if opts[:write_concern]
+              WriteConcern.get(opts[:write_concern])
+            else
+              temp_write_concern
+            end
+        operation = Operation::Drop.new({
             selector: { :drop => name },
             db_name: database.name,
             write_concern: write_concern,
             session: session,
           })
-          do_drop(operation, session, context)
+        OpenTelemetry.trace_operation(operation, context) do
+          maybe_drop_emm_collections(opts[:encrypted_fields], client, session) do
+            do_drop(operation, session, context)
+          end
         end
       end
     end
@@ -865,9 +867,8 @@ module Mongo
           session: session,
           operation_timeouts: operation_timeouts(opts)
           )
-        write_with_retry(write_concern, context: context) do |connection, txn_num, context|
-          Operation::Insert.new(
-            :documents => [ document ],
+        operation = Operation::Insert.new(
+            :documents => [document],
             :db_name => database.name,
             :coll_name => name,
             :write_concern => write_concern,
@@ -875,9 +876,13 @@ module Mongo
             :options => opts,
             :id_generator => client.options[:id_generator],
             :session => session,
-            :txn_num => txn_num,
             :comment => opts[:comment]
-          ).execute_with_connection(connection, context: context)
+          )
+        OpenTelemetry.trace_operation(operation, context, 'insert_one') do
+          write_with_retry(write_concern, context: context) do |connection, txn_num, context|
+            operation.txn_num = txn_num
+            operation.execute_with_connection(connection, context: context)
+          end
         end
       end
     end
@@ -910,7 +915,7 @@ module Mongo
     def insert_many(documents, options = {})
       QueryCache.clear_namespace(namespace)
 
-      inserts = documents.map{ |doc| { :insert_one => doc }}
+      inserts = documents.map { |doc| { :insert_one => doc } }
       bulk_write(inserts, options)
     end
 
