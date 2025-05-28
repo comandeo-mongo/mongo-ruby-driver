@@ -41,6 +41,7 @@ module Mongo
         connection_global_id: nil,
         operation_timeouts: {},
         view: nil,
+        tracer: OpenTelemetry.tracer,
         options: nil
       )
         if options
@@ -61,6 +62,7 @@ module Mongo
         @session = session
         @view = view
         @connection_global_id = connection_global_id
+        @tracer = tracer
         @options = options
         super(session: session, operation_timeouts: operation_timeouts)
       end
@@ -69,6 +71,9 @@ module Mongo
       attr_reader :session
       attr_reader :view
       attr_reader :options
+      attr_reader :tracer
+
+      attr_accessor :current_span, :current_context
 
       # Returns a new Operation::Context with the deadline refreshed
       # and relative to the current moment.
