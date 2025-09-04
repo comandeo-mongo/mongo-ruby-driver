@@ -61,29 +61,23 @@ module Mongo
           @operation_tracer.trace_operation(operation, operation_context, op_name: op_name, &block)
         end
 
+        def start_transaction_span(session)
+          @operation_tracer.start_transaction_span(session)
+        end
+
+        def finish_transaction_span(session)
+          @operation_tracer.finish_transaction_span(session)
+        end
+
         def trace_command(message, operation_context, connection, &block)
           return yield unless enabled?
 
           @command_tracer.trace_command(message, operation_context, connection, &block)
         end
 
-        def cursor_context_map
-          @cursor_context_map ||= {}
-        end
-
-        def cursor_map_key(session, cursor_id)
-          return if cursor_id.nil? || session.nil?
-
-          "#{session.session_id['id'].to_uuid}-#{cursor_id}"
-        end
-
-        def parent_context_for(operation_context, cursor_id)
+        def parent_context_for(operation_context)
           if (key = transaction_map_key(operation_context.session))
             transaction_context_map[key]
-          elsif (_key = cursor_map_key(operation_context.session, cursor_id))
-            # We return nil here unless we decide how to nest cursor operations.
-            nil
-            # cursor_context_map[key]
           end
         end
 
@@ -92,9 +86,10 @@ module Mongo
         end
 
         def transaction_map_key(session)
+          byebug
           return if session.nil? || session.implicit? || !session.in_transaction?
 
-          "#{session.session_id['id'].to_uuid}-#{session.txn_num}"
+          session.session_id['id'].to_uuid.to_s
         end
 
         private

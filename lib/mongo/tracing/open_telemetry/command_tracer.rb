@@ -24,7 +24,6 @@ module Mongo
         extend Forwardable
 
         def_delegators :@parent_tracer,
-          :cursor_context_map,
           :parent_context_for,
           :transaction_context_map,
           :transaction_map_key
@@ -36,7 +35,7 @@ module Mongo
         end
 
         def trace_command(message, operation_context, connection)
-          parent_context = parent_context_for(operation_context, cursor_id(message))
+          parent_context = parent_context_for(operation_context)
           span = @otel_tracer.start_span(
             query_summary(message),
             attributes: span_attributes(message, connection),

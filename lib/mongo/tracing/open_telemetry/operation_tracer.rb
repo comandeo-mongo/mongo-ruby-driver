@@ -24,7 +24,6 @@ module Mongo
         extend Forwardable
 
         def_delegators :@parent_tracer,
-          :cursor_context_map,
           :parent_context_for,
           :transaction_context_map,
           :transaction_map_key
@@ -35,7 +34,7 @@ module Mongo
         end
 
         def trace_operation(operation, operation_context, op_name: nil)
-          parent_context = parent_context_for(operation_context, operation.cursor_id)
+          parent_context = parent_context_for(operation_context)
           span = @otel_tracer.start_span(
             operation_span_name(operation, op_name),
             attributes: span_attributes(operation, op_name),
@@ -52,6 +51,32 @@ module Mongo
           span&.status = ::OpenTelemetry::Trace::Status.error("Unhandled exception of type: #{e.class}")
           raise e
         ensure
+          span&.finish
+        end
+
+        def start_transaction_span(session)
+          raise ArgumentError, 'Session must have a transaction' unless session.in_transaction?
+          key = transaction_map_key(session)
+          raise ArgumentError, 'Transaction already started' if transaction_context_map[key]
+
+          span = @otel_tracer.start_span(
+            'transaction',
+            attributes: {
+              'db.system' => 'mongodb',
+              'db.operation.name' => 'transaction',
+            },
+            kind: :client
+          )
+          transaction_context_map[key] = ::OpenTelemetry::Trace.context_with_span(span)
+        end
+
+        def finish_transaction_span(session)
+          raise ArgumentError, 'Session must have a transaction' unless session.in_transaction?
+          key = transaction_map_key(session)
+          context = transaction_context_map.delete(key)
+          return unless context
+
+          span = ::OpenTelemetry::Trace.current_span(context)
           span&.finish
         end
 
@@ -79,14 +104,7 @@ module Mongo
         def process_cursor_context(result, cursor_id, context, span)
           return unless result.is_a?(Cursor)
 
-          if result.id.zero?
-            # If the cursor is closed, remove it from the context map.
-            cursor_context_map.delete(cursor_id)
-          elsif result.id && cursor_id.nil?
-            # New cursor created, store its context.
-            cursor_context_map[result.id] = context
-            span.set_attribute('db.mongodb.cursor_id', result.id)
-          end
+          span.set_attribute('db.mongodb.cursor_id', result.id) if result.id.positive?
         end
 
         def collection_name(operation)

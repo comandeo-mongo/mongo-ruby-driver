@@ -625,6 +625,8 @@ module Mongo
       @state = STARTING_TRANSACTION_STATE
       @already_committed = false
 
+      tracer.start_transaction_span(self)
+
       # This method has no explicit return value.
       # We could return nil here but true indicates to the user that the
       # operation succeeded. This is intended for interactive use.
@@ -707,6 +709,7 @@ module Mongo
           end
         end
       ensure
+        tracer.finish_transaction_span(self)
         @state = TRANSACTION_COMMITTED_STATE
         @committing_transaction = false
       end
@@ -781,6 +784,7 @@ module Mongo
         @state = TRANSACTION_ABORTED_STATE
         raise
       ensure
+        tracer.finish_transaction_span(self)
         @aborting_transaction = false
       end
 
