@@ -59,7 +59,7 @@ buildvariants:
       os: ubuntu2204
     display_name: ${auth-and-ssl} ${ruby} db-${mongodb-version} ${topology}
     tasks:
-      - name: "test-mlaunch"
+      - name: "run-main-test-suite"
 
   - matrix_name: "mongo-recent"
     matrix_spec:
