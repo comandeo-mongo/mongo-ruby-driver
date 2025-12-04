@@ -266,23 +266,46 @@ EOT
     Pathname.new("#{spec_root}/support/certificates")
   end
 
+  def evergreen_certs_dir
+    Pathname.new("#{spec_root}/../.evergreen/x509gen")
+  end
+
   def ocsp_files_dir
     Pathname.new("#{spec_root}/../.mod/drivers-evergreen-tools/.evergreen/ocsp")
   end
 
-  # TLS certificates & keys
+  # Evergreen cert paths
+
+  def evergreen_ca_pem_path
+    "#{evergreen_certs_dir}/ca.pem"
+  end
+
+  def evergreen_client_pem_path
+    "#{evergreen_certs_dir}/client.pem"
+  end
+
+  def ca_cert_path
+    if drivers_tools?
+      evergreen_ca_pem_path
+    else
+      local_ca_cert_path
+    end
+  end
+
+  def client_key_path
+    if drivers_tools?
+      evergreen_client_pem_path
+    else
+      local_client_key_path
+    end
+  end
+
+  # Local TLS certificates & keys
 
   def local_client_key_path
     "#{ssl_certs_dir}/client.key"
   end
 
-  def client_key_path
-    if drivers_tools? && ENV['DRIVER_TOOLS_CLIENT_KEY_PEM']
-      ENV['DRIVER_TOOLS_CLIENT_KEY_PEM']
-    else
-      local_client_key_path
-    end
-  end
 
   def local_client_cert_path
     "#{ssl_certs_dir}/client.crt"
@@ -346,14 +369,6 @@ EOT
 
   def local_ca_cert_path
     "#{ssl_certs_dir}/ca.crt"
-  end
-
-  def ca_cert_path
-    if drivers_tools? && ENV['DRIVER_TOOLS_CA_PEM']
-      ENV['DRIVER_TOOLS_CA_PEM']
-    else
-      local_ca_cert_path
-    end
   end
 
   def multi_ca_path
