@@ -284,6 +284,14 @@ EOT
     "#{evergreen_certs_dir}/client.pem"
   end
 
+  def evergreen_client_key_path
+    "#{evergreen_certs_dir}/client-private.pem"
+  end
+
+  def evergreen_client_cert_path
+    "#{evergreen_certs_dir}/client-public.pem"
+  end
+
   def ca_cert_path
     if drivers_tools?
       evergreen_ca_pem_path
@@ -292,11 +300,27 @@ EOT
     end
   end
 
-  def client_key_path
+  def client_cert_path
     if drivers_tools?
       evergreen_client_pem_path
     else
+      local_client_cert_path
+    end
+  end
+
+  def client_key_path
+    if drivers_tools?
+      evergreen_client_key_path
+    else
       local_client_key_path
+    end
+  end
+
+  def client_pem_path
+    if drivers_tools?
+      evergreen_client_pem_path
+    else
+      local_client_pem_path
     end
   end
 
@@ -306,17 +330,8 @@ EOT
     "#{ssl_certs_dir}/client.key"
   end
 
-
   def local_client_cert_path
     "#{ssl_certs_dir}/client.crt"
-  end
-
-  def client_cert_path
-    if drivers_tools? && ENV['DRIVER_TOOLS_CLIENT_CERT_PEM']
-      ENV['DRIVER_TOOLS_CLIENT_CERT_PEM']
-    else
-      local_client_cert_path
-    end
   end
 
   def local_client_pem_path
@@ -324,14 +339,6 @@ EOT
       "#{ssl_certs_dir}/client.pem"
     else
       Pathname.new("#{spec_root}/support/ocsp/#{algo}/server.pem")
-    end
-  end
-
-  def client_pem_path
-    if drivers_tools? && ENV['DRIVER_TOOLS_CLIENT_CERT_KEY_PEM']
-      ENV['DRIVER_TOOLS_CLIENT_CERT_KEY_PEM']
-    else
-      local_client_pem_path
     end
   end
 
