@@ -29,7 +29,7 @@ class SpecConfig
         @connect_options = { connect: :direct }
       end
       if @uri_options[:ssl].nil?
-        @ssl = (ENV['SSL'] == 'ssl') || (ENV['SSL_ENABLED'] == 'true')
+        @ssl = (%w(yes ssl).include?(ENV['SSL'])) || (ENV['SSL_ENABLED'] == 'true')
       else
         @ssl = @uri_options[:ssl]
       end
