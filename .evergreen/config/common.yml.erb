@@ -10,7 +10,7 @@ pre_error_fails_task: true
 # Actual testing tasks are marked with `type: test`
 command_type: system
 
-# Protect ourself against rogue test case, or curl gone wild, that runs forever.
+# Protect ourselves against rogue test case, or curl gone wild, that runs forever.
 exec_timeout_secs: 5400
 
 # What to do when evergreen hits the timeout (`post:` tasks are run automatically)
@@ -21,6 +21,11 @@ timeout:
         true
 
 functions:
+  assume-test-secrets-ec2-role:
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+
   "fetch source":
     # Executes git clone and applies the submitted patch, if any
     - command: git.get_project
@@ -34,7 +39,7 @@ functions:
 
           git submodule update --init --recursive
 
-  "create expansions":
+  setup-system:
     # Make an evergreen expansion file with dynamic values
     - command: shell.exec
       params:
@@ -85,6 +90,7 @@ functions:
             export AUTH=${AUTH}
             export SSL=${SSL}
             export TOPOLOGY=${TOPOLOGY}
+            export MLAUNCH_TOPOLOGY=${MLAUNCH_TOPOLOGY}
             export COMPRESSOR=${COMPRESSOR}
             export RVM_RUBY="${RVM_RUBY}"
             export MONGODB_VERSION=${MONGODB_VERSION}
@@ -117,25 +123,35 @@ functions:
             export ATLAS_FREE_TIER_URI="${atlas_free_tier_uri}"
             export ATLAS_TLS11_URI="${atlas_tls11_uri}"
             export ATLAS_TLS12_URI="${atlas_tls12_uri}"
-            export ATLAS_SERVERLESS_URI="${atlas_serverless_uri}"
-            export ATLAS_SERVERLESS_LB_URI="${atlas_serverless_lb_uri}"
             export RVM_RUBY="${RVM_RUBY}"
-
-            export SERVERLESS_DRIVERS_GROUP="${SERVERLESS_DRIVERS_GROUP}"
-            export SERVERLESS_API_PUBLIC_KEY="${SERVERLESS_API_PUBLIC_KEY}"
-            export SERVERLESS_API_PRIVATE_KEY="${SERVERLESS_API_PRIVATE_KEY}"
-            export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
-            export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
           EOT
 
           # See what we've done
           cat expansion.yml
-
     # Load the expansion file to make an evergreen variable with the current
     # unique version
     - command: expansions.update
       params:
         file: src/expansion.yml
+    - command: subprocess.exec
+      params:
+        binary: bash
+        include_expansions_in_env: ["PROJECT_DIRECTORY"]
+        args:
+          - "${DRIVERS_TOOLS}/.evergreen/setup.sh"
+
+  bootstrap-mongo-orchestration:
+    - command: subprocess.exec
+      params:
+        binary: bash
+        env:
+          MONGODB_VERSION: ${MONGODB_VERSION}
+        include_expansions_in_env: [TOPOLOGY, AUTH, SSL, ORCHESTRATION_FILE,
+            REQUIRE_API_VERSION, LOAD_BALANCER]
+        args: ["${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh"]
+    - command: expansions.update
+      params:
+        file: mo-expansion.yml
 
   "export AWS auth credentials":
     - command: shell.exec
@@ -184,7 +200,9 @@ functions:
             export AWS_DEFAULT_REGION="${fle_aws_region}"
           fi
           export CSOT_SPEC_TESTS=1
-          TEST_CMD="bundle exec rspec spec/spec_tests/client_side_operations_timeout_spec.rb" \
+          unset TOPOLOGY
+          export TOPOLOGY=${MLAUNCH_TOPOLOGY}
+          TEST_CMD="bundle exec rspec spec/spec_tests/client_side_operations_timeout_spec.rb --format Rfc::Riff --format RspecJunitFormatter --out tmp/rspec.xml" \
             .evergreen/run-tests.sh
 
   "export FLE credentials":
@@ -260,40 +278,6 @@ functions:
         content_type: ${content_type|application/x-gzip}
         display_name: "mongodb-logs.tar.gz"
 
-  "upload working dir":
-    - command: archive.targz_pack
-      params:
-        target: "working-dir.tar.gz"
-        source_dir: ${PROJECT_DIRECTORY}/
-        include:
-          - "./**"
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: working-dir.tar.gz
-        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/artifacts/${task_id}-${execution}-working-dir.tar.gz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: "working-dir.tar.gz"
-    - command: archive.targz_pack
-      params:
-        target: "drivers-dir.tar.gz"
-        source_dir: ${DRIVERS_TOOLS}
-        include:
-          - "./**"
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: drivers-dir.tar.gz
-        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/artifacts/${task_id}-${execution}-drivers-dir.tar.gz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: "drivers-dir.tar.gz"
-
   "upload test results to s3":
     - command: s3.put
       params:
@@ -346,7 +330,7 @@ functions:
   "upload test results":
     - command: attach.xunit_results
       params:
-        file: ./src/rspec.xml
+        file: ./src/tmp/*.xml
 
   "delete private environment":
     - command: shell.exec
@@ -357,17 +341,6 @@ functions:
         script: |
           rm -f .env.private
 
-  "build and test docker image":
-    - command: shell.exec
-      type: test
-      params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          set -x
-          .evergreen/test-on-docker -d ${os} MONGODB_VERSION=${mongodb-version} TOPOLOGY=${topology} RVM_RUBY=${ruby} -s .evergreen/run-tests.sh TEST_CMD=true ${PRELOAD_ARG}
-
   "run benchmarks":
     - command: shell.exec
       type: test
@@ -376,11 +349,22 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
+          unset TOPOLOGY
+          export TOPOLOGY=${MLAUNCH_TOPOLOGY}
           TEST_CMD="bundle exec rake driver_bench" PERFORMANCE_RESULTS_FILE="$PROJECT_DIRECTORY/perf.json" .evergreen/run-tests.sh
     - command: perf.send
       params:
         file: "${PROJECT_DIRECTORY}/perf.json"
 
+  "run tests with orchestration and drivers tools":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: "src"
+        include_expansions_in_env: [MONGODB_URI, AUTH, SSL, TOPOLOGY, COMPRESSOR, RVM_RUBY]
+        args:
+          - ".evergreen/run-tests-new.sh"
   "run tests":
     - command: shell.exec
       type: test
@@ -396,24 +380,9 @@ functions:
             export AWS_SECRET_ACCESS_KEY="${fle_aws_secret}"
             export AWS_DEFAULT_REGION="${fle_aws_region}"
           fi
+          unset TOPOLOGY
+          export TOPOLOGY=${MLAUNCH_TOPOLOGY}
           .evergreen/run-tests.sh
-
-  "run tests via docker":
-    - command: shell.exec
-      type: test
-      params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          # Needed for generating temporary aws credentials.
-          if [ -n "${FLE}" ];
-          then
-            export AWS_ACCESS_KEY_ID="${fle_aws_key}"
-            export AWS_SECRET_ACCESS_KEY="${fle_aws_secret}"
-            export AWS_DEFAULT_REGION="${fle_aws_region}"
-          fi
-          .evergreen/run-tests-docker.sh
 
   "run AWS auth tests":
     - command: shell.exec
@@ -423,6 +392,8 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
+          unset TOPOLOGY
+          export TOPOLOGY=${MLAUNCH_TOPOLOGY}
           .evergreen/run-tests-aws-auth.sh
 
   "run Kerberos unit tests":
@@ -435,16 +406,6 @@ functions:
           ${PREPARE_SHELL}
           .evergreen/run-tests-kerberos-unit.sh
 
-  "run Kerberos integration tests":
-    - command: shell.exec
-      type: test
-      params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/run-tests-kerberos-integration.sh
-
   "run Atlas tests":
     - command: shell.exec
       type: test
@@ -453,124 +414,35 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          MONGODB_URI="${MONGODB_URI}" .evergreen/run-tests-atlas.sh
-
-  "run serverless tests":
-    - command: shell.exec
-      type: test
-      params:
-        shell: bash
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          # Needed for generating temporary aws credentials.
-          if [ -n "${FLE}" ];
-          then
-            export AWS_ACCESS_KEY_ID="${fle_aws_key}"
-            export AWS_SECRET_ACCESS_KEY="${fle_aws_secret}"
-            export AWS_DEFAULT_REGION="${fle_aws_region}"
-          fi
-
-          CRYPT_SHARED_LIB_PATH="${CRYPT_SHARED_LIB_PATH}" SERVERLESS=1 SSL=ssl RVM_RUBY="${RVM_RUBY}" SINGLE_MONGOS="${SINGLE_MONGOS}" SERVERLESS_URI="${SERVERLESS_URI}" FLE="${FLE}" SERVERLESS_MONGODB_VERSION="${SERVERLESS_MONGODB_VERSION}" .evergreen/run-tests-serverless.sh
+          AUTH=${AUTH} SSL=${SSL} TOPOLOGY=${TOPOLOGY} RVM_RUBY="${RVM_RUBY}" \
+          ATLAS_REPLICA_SET_URI=${atlas_replica_set_uri} ATLAS_SHARDED_URI=${atlas_sharded_uri} \
+          ATLAS_FREE_TIER_URI=${atlas_free_tier_uri} ATLAS_TLS11_URI=${atlas_tls11_uri} \
+          ATLAS_TLS12_URI=${atlas_tls12_uri} ATLAS_SERVERLESS_URI=${atlas_serverless_uri} \
+          ATLAS_SERVERLESS_LB_URI=${atlas_serverless_lb_uri} \
+          ATLAS_X509_CERT_BASE64="${atlas_x509_cert_base64}" \
+          ATLAS_X509_URI="${atlas_x509}" \
+          ATLAS_X509_DEV_CERT_BASE64="${atlas_x509_dev_cert_base64}" \
+          ATLAS_X509_DEV_URI="${atlas_x509_dev}" \
+          .evergreen/run-tests-atlas.sh
 
 pre:
+  - func: assume-test-secrets-ec2-role
   - func: "fetch source"
-  - func: "create expansions"
+  - func: setup-system
 
 post:
   - func: "delete private environment"
-  # Removed, causing timeouts
-  # - func: "upload working dir"
   - func: "upload mo artifacts"
-  # - func: "upload test results"
+  - func: "upload test results"
   - func: "upload test results to s3"
 
 task_groups:
-  - name: serverless_task_group
-    setup_group_can_fail_task: true
-    setup_group_timeout_secs: 1800 # 30 minutes
-    setup_group:
-      - func: "fetch source"
-      - func: "create expansions"
-      - command: ec2.assume_role
-        params:
-          role_arn: ${aws_test_secrets_role}
-      - command: shell.exec
-        params:
-          shell: "bash"
-          script: |
-            ${PREPARE_SHELL}
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/setup-secrets.sh
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/create-instance.sh
-      - command: expansions.update
-        params:
-          file: serverless-expansion.yml
-    teardown_task:
-      - command: shell.exec
-        params:
-          script: |
-            ${PREPARE_SHELL}
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/delete-instance.sh
-      - func: "upload test results"
-    tasks:
-      - "test-serverless"
-
-  - name: testatlas_task_group
-    setup_group_can_fail_task: true
-    setup_group_timeout_secs: 1800 # 30 minutes
-    setup_group:
-      - func: fetch source
-      - func: create expansions
-      - command: shell.exec
-        params:
-          shell: "bash"
-          working_dir: "src"
-          script: |
-            ${PREPARE_SHELL}
-
-            echo "Setting up Atlas cluster"
-
-            DRIVERS_ATLAS_PUBLIC_API_KEY="${DRIVERS_ATLAS_PUBLIC_API_KEY}" \
-              DRIVERS_ATLAS_PRIVATE_API_KEY="${DRIVERS_ATLAS_PRIVATE_API_KEY}" \
-              DRIVERS_ATLAS_GROUP_ID="${DRIVERS_ATLAS_GROUP_ID}" \
-              DRIVERS_ATLAS_LAMBDA_USER="${DRIVERS_ATLAS_LAMBDA_USER}" \
-              DRIVERS_ATLAS_LAMBDA_PASSWORD="${DRIVERS_ATLAS_LAMBDA_PASSWORD}" \
-              DRIVERS_ATLAS_BASE_URL="${DRIVERS_ATLAS_BASE_URL}" \
-              LAMBDA_STACK_NAME="dbx-ruby-lambda" \
-              MONGODB_VERSION="7.0" \
-              task_id="${task_id}" \
-              execution="${execution}" \
-              $DRIVERS_TOOLS/.evergreen/atlas/setup-atlas-cluster.sh
-
-              echo "MONGODB_URI=${MONGODB_URI}"
-      - command: expansions.update
-        params:
-          file: src/atlas-expansion.yml
-    teardown_group:
-      - command: shell.exec
-        params:
-          shell: "bash"
-          working_dir: "src"
-          script: |
-            ${PREPARE_SHELL}
-
-            DRIVERS_ATLAS_PUBLIC_API_KEY="${DRIVERS_ATLAS_PUBLIC_API_KEY}" \
-              DRIVERS_ATLAS_PRIVATE_API_KEY="${DRIVERS_ATLAS_PRIVATE_API_KEY}" \
-              DRIVERS_ATLAS_GROUP_ID="${DRIVERS_ATLAS_GROUP_ID}" \
-              DRIVERS_ATLAS_BASE_URL="${DRIVERS_ATLAS_BASE_URL}" \
-              LAMBDA_STACK_NAME="dbx-ruby-lambda" \
-              task_id="${task_id}" \
-              execution="${execution}" \
-              $DRIVERS_TOOLS/.evergreen/atlas/teardown-atlas-cluster.sh
-    tasks:
-      - test-atlas
-
   - name: testatlas_full_task_group
     setup_group_can_fail_task: true
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: fetch source
-      - func: create expansions
+      - func: setup-system
       - command: shell.exec
         params:
           shell: "bash"
@@ -620,7 +492,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: fetch source
-      - func: create expansions
+      - func: setup-system
       - command: shell.exec
         params:
           shell: "bash"
@@ -670,7 +542,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: fetch source
-      - func: "create expansions"
+      - func: setup-system
       - command: shell.exec
         params:
           shell: "bash"
@@ -707,7 +579,7 @@ task_groups:
     setup_group_timeout_secs: 1800 # 30 minutes
     setup_group:
       - func: fetch source
-      - func: "create expansions"
+      - func: setup-system
       - command: shell.exec
         params:
           shell: "bash"
@@ -747,29 +619,19 @@ task_groups:
       - testazurekms-task
 
 tasks:
+  - name: "run-main-test-suite"
+    commands:
+      - func: bootstrap-mongo-orchestration
+      - func: "run tests with orchestration and drivers tools"
   - name: "test-atlas"
     commands:
       - func: "run Atlas tests"
-  - name: "test-serverless"
-    commands:
-      - func: "export FLE credentials"
-      - func: "run serverless tests"
-  - name: "test-docker"
-    commands:
-      - func: "build and test docker image"
   - name: "test-mlaunch"
     commands:
       - func: "run tests"
   - name: "driver-bench"
     commands:
       - func: "run benchmarks"
-  - name: "test-via-docker"
-    commands:
-      - func: "run tests via docker"
-  - name: "test-kerberos-integration"
-    commands:
-      - func: "export Kerberos credentials"
-      - func: "run Kerberos integration tests"
   - name: "test-kerberos"
     commands:
       - func: "run Kerberos unit tests"
@@ -780,10 +642,6 @@ tasks:
     commands:
       - func: "export FLE credentials"
       - func: "run tests"
-  - name: "test-fle-via-docker"
-    commands:
-      - func: "export FLE credentials"
-      - func: "run tests via docker"
   - name: "test-aws-auth"
     commands:
       - func: "export AWS auth credentials"

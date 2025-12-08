@@ -1,22 +1,24 @@
 #!/bin/bash
 
-set -ex
+set -e
+set -o pipefail
+
+if echo "$AUTH" |grep -q ^aws; then
+  # Do not set -x as this will expose passwords in Evergreen logs
+  set +x
+else
+  set -x
+fi
+
+if test -z "$PROJECT_DIRECTORY"; then
+  PROJECT_DIRECTORY=`realpath $(dirname $0)/..`
+fi
 
 MRSS_ROOT=`dirname "$0"`/../spec/shared
-
 . $MRSS_ROOT/shlib/distro.sh
-. $MRSS_ROOT/shlib/set_env.sh
-. $MRSS_ROOT/shlib/config.sh
 . `dirname "$0"`/functions.sh
-. `dirname "$0"`/functions-config.sh
 
 arch=`host_distro`
-
-show_local_instructions
-
-set_env_vars
-set_env_python
-
 
 # Install rbenv and download the requested ruby version
 rm -rf ~/.rbenv
@@ -29,17 +31,22 @@ export FULL_RUBY_VERSION=$(ls ~/.rbenv/versions | head -n1)
 rbenv global $FULL_RUBY_VERSION
 
 export JAVA_HOME=/opt/java/jdk21
-
 export JAVACMD=$JAVA_HOME/bin/java
-export BUNDLE_GEMFILE=gemfiles/mongo_kerberos.gemfile
+
 bundle_install
 
-export MONGO_RUBY_DRIVER_KERBEROS=1
+if test "$TOPOLOGY" = replica_set; then
+echo $MONGODB_URI
+  bundle exec ruby -Ilib -I.evergreen/lib -rserver_setup -e ServerSetup.new.setup_tags
+fi
 
-bundle exec rspec \
-  spec/spec_tests/uri_options_spec.rb \
-  spec/spec_tests/connection_string_spec.rb \
-  spec/mongo/uri/srv_protocol_spec.rb \
-  spec/mongo/uri_spec.rb \
-  spec/integration/client_authentication_options_spec.rb \
-  --format Rfc::Riff --format RspecJunitFormatter --out tmp/rspec.xml
+bundle exec rake spec:ci
+test_status=$?
+echo "TEST STATUS: ${test_status}"
+set -e
+
+if test -f tmp/rspec-all.json; then
+  mv tmp/rspec-all.json tmp/rspec.json
+fi
+
+exit ${test_status}
