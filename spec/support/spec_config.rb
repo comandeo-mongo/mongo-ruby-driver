@@ -570,8 +570,8 @@ EOT
       if @mongodb_uri.servers.grep(/mongodb.*\.net/).empty?
         options.merge!(
           {
-            ssl_cert: client_cert_path,
-            ssl_key: client_key_path,
+            # ssl_cert: client_cert_path,
+            # ssl_key: client_key_path,
             ssl_ca_cert: ca_cert_path,
           }
         )
