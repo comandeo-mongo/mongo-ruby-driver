@@ -40,7 +40,6 @@ module Mongo
         # reasonable to refactor things so this saved reference is used instead.
         @context = context
 
-        session&.materialize_if_needed
         unpin_maybe(session, connection) do
           add_error_labels(connection, context) do
             check_for_network_error do
@@ -92,8 +91,15 @@ module Mongo
           end
         end
 
-        do_execute(connection, context, options).tap do |result|
-          validate_result(result, connection, context)
+        session&.materialize_if_needed
+        begin
+          span = context.tracer.start_span(command(connection), connection.address, context.current_context)
+          do_execute(connection, context, options).tap do |result|
+            context.tracer.add_attributes_from_result(span, result)
+            validate_result(result, connection, context)
+          end
+        ensure
+          span&.finish
         end
       end
 
@@ -111,6 +117,7 @@ module Mongo
       def dispatch_message(connection, context, options = {})
         message = build_message(connection, context)
         message = message.maybe_encrypt(connection, context)
+        context.tracer.add_query_text(context.current_span, message)
         reply = connection.dispatch([ message ], context, options)
         [reply, connection.description, connection.global_id]
       end

@@ -169,6 +169,7 @@ module Mongo
           raise Error::LintError, "Trying to deliver a message over a disconnected connection (to #{address})"
         end
         buffer = serialize(message, context)
+        context&.tracer&.add_event(context&.current_span, 'Message Ready')
         check_timeout!(context)
         ensure_connected do |socket|
           operation_id = Monitoring.next_operation_id
@@ -207,6 +208,7 @@ module Mongo
               server_connection_id: description.server_connection_id,
               service_id: description.service_id,
             )
+            context&.tracer&.add_event(context&.current_span, 'Response Received')
           end
           if result && context.decrypt?
             result = result.maybe_decrypt(context)

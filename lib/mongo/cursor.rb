@@ -514,10 +514,17 @@ module Mongo
 
     def execute_operation(op, context: nil)
       op_context = context || possibly_refreshed_context
-      if @connection.nil?
-        op.execute(@server, context: op_context)
-      else
-        op.execute_with_connection(@connection, context: op_context)
+      op_context.tracer.in_span('getMore', {}) do |span, ctx|
+        op_context.current_span = span
+        op_context.current_context = ctx
+        if @connection.nil?
+          op.execute(@server, context: op_context)
+        else
+          op.execute_with_connection(@connection, context: op_context)
+        end
+      ensure
+        op_context.current_span = nil
+        op_context.current_context = nil
       end
     end
 
