@@ -24,44 +24,33 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: recursive
-
-    - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
-    - name: "Set up MongoDB"
-      id: setup-mongodb
-      uses: ./tests/drivers-evergreen-tools
+    - id: start-mongodb
+      name: start mongodb
+      uses: mongodb-labs/drivers-evergreen-tools@master
       with:
-        version: ${{ matrix.mongodb }}
-        topology: ${{ matrix.topology }}
-
+        version: "${{matrix.mongodb}}"
+        topology: "${{matrix.topology}}"
     - name: load ruby
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: "${{matrix.ruby}}"
         bundler: 2
-
     - name: bundle
       run: bundle install --jobs 4 --retry 3
-
     - name: prepare test suite
       run: bundle exec rake spec:prepare
       env:
         MONGODB_URI: ${{ steps.start-mongodb.outputs.cluster-uri }}
-
     - name: prepare replica set
       run: ruby -Ilib -I.evergreen/lib -rbundler/setup -rserver_setup -e ServerSetup.new.setup_tags
       if: ${{ matrix.topology == 'replica_set' }}
       env:
         MONGODB_URI: ${{ steps.start-mongodb.outputs.cluster-uri }}
-
     - name: wait for sessions
       run: bundle exec rake spec:wait_for_sessions
       if: ${{ matrix.topology == 'sharded_cluster' && matrix.mongodb == '3.6' }}
       env:
         MONGODB_URI: ${{ steps.start-mongodb.outputs.cluster-uri }}
-
     - name: test
       timeout-minutes: 60
       continue-on-error: false
