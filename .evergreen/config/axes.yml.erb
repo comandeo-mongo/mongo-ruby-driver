@@ -2,6 +2,10 @@ axes:
   - id: "mongodb-version"
     display_name: MongoDB Version
     values:
+      - id: "rapid"
+        display_name: "Rapid"
+        variables:
+          MONGODB_VERSION: "rapid"
       - id: "8.0"
         display_name: "8.0"
         variables:
@@ -288,6 +292,10 @@ axes:
         display_name: via LMC path
         variables:
           FLE: path
+      - id: "mongocryptd"
+        display_name: mongocryptd (no crypt_shared)
+        variables:
+          FLE: mongocryptd
 
   - id: ocsp-algorithm
     display_name: OCSP Algorithm

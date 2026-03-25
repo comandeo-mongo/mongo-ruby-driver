@@ -38,7 +38,7 @@ describe Mongo::Crypt::Handle do
     end
 
     let(:crypt_shared_lib_path) do
-      nil
+      SpecConfig.instance.crypt_shared_lib_path
     end
 
     let(:crypt_shared_lib_required) do
@@ -97,6 +97,12 @@ describe Mongo::Crypt::Handle do
       context 'with crypt_shared_lib_path' do
         min_server_version '6.0.0'
 
+        before(:all) do
+          if ENV['FLE'] == 'mongocryptd'
+            skip 'FLE=mongocryptd is incompatible with unloaded binding tests'
+          end
+        end
+
         context 'with correct path' do
           let(:crypt_shared_lib_path) do
             SpecConfig.instance.crypt_shared_lib_path
@@ -120,6 +126,12 @@ describe Mongo::Crypt::Handle do
 
       context 'with crypt_shared_lib_required' do
         min_server_version '6.0.0'
+
+        before(:all) do
+          if ENV['FLE'] == 'mongocryptd'
+            skip 'FLE=mongocryptd is incompatible with unloaded binding tests'
+          end
+        end
 
         context 'set to true' do
           let(:crypt_shared_lib_required) do
@@ -151,9 +163,8 @@ describe Mongo::Crypt::Handle do
       context 'if bypass_query_analysis is true' do
         min_server_version '6.0.0'
 
-        let(:bypass_query_analysis) do
-          true
-        end
+        let(:bypass_query_analysis) { true }
+        let(:crypt_shared_lib_path) { nil }
 
         it 'does not load the crypt shared lib' do
           expect(Mongo::Crypt::Binding).not_to receive(:setopt_append_crypt_shared_lib_search_path)
@@ -165,9 +176,8 @@ describe Mongo::Crypt::Handle do
       context 'if explicit_encryption_only is true' do
         min_server_version '6.0.0'
 
-        let(:explicit_encryption_only) do
-          true
-        end
+        let(:explicit_encryption_only) { true }
+        let(:crypt_shared_lib_path) { nil }
 
         it 'does not load the crypt shared lib' do
           expect(Mongo::Crypt::Binding).not_to receive(:setopt_append_crypt_shared_lib_search_path)
