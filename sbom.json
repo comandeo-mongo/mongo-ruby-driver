@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:f0d3d831-b1f9-4378-b911-07bb25fe5f91",
+  "serialNumber": "urn:uuid:dcd19ab8-ed06-4edd-85b9-db0fa15dc012",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-03-24T14:38:04Z",
+    "timestamp": "2026-03-25T11:35:36Z",
     "tools": {
       "components": [
         {
@@ -2178,12 +2178,12 @@
       "author": "Daniel Luz",
       "group": "",
       "name": "json",
-      "version": "2.19.2",
+      "version": "2.19.3",
       "description": "A JSON implementation as a JRuby extension.",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "1a26ce4fcfd3ce1b6c2815e37dc306457aaf30acaabc1c99b26ee1dfa9fe5a78"
+          "content": "1043dd2d0faa46fc629db9524a75b83553e78c6d3faa1dd178b682ab698f63d5"
         }
       ],
       "licenses": [
@@ -2194,7 +2194,7 @@
           }
         }
       ],
-      "purl": "pkg:gem/json@2.19.2",
+      "purl": "pkg:gem/json@2.19.3",
       "externalReferences": [
         {
           "type": "issue-tracker",
@@ -2206,7 +2206,7 @@
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:gem/json@2.19.2",
+      "bom-ref": "pkg:gem/json@2.19.3",
       "properties": [
         {
           "name": "SrcFile",
@@ -2226,7 +2226,7 @@
         },
         {
           "name": "cdx:gem:gemUri",
-          "value": "https://rubygems.org/gems/json-2.19.2-java.gem"
+          "value": "https://rubygems.org/gems/json-2.19.3-java.gem"
         }
       ]
     },
@@ -4101,12 +4101,12 @@
       "author": "Soutaro Matsumoto",
       "group": "",
       "name": "rbs",
-      "version": "3.10.3",
+      "version": "3.10.4",
       "description": "RBS is the language for type signatures for Ruby and standard library definitions.",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "70627f3919016134d554e6c99195552ae3ef6020fe034c8e983facc9c192daa6"
+          "content": "b17d7c4be4bb31a11a3b529830f0aa206a807ca42f2e7921a3027dfc6b7e5ce8"
         }
       ],
       "licenses": [
@@ -4123,7 +4123,7 @@
           }
         }
       ],
-      "purl": "pkg:gem/rbs@3.10.3",
+      "purl": "pkg:gem/rbs@3.10.4",
       "externalReferences": [
         {
           "type": "vcs",
@@ -4135,7 +4135,7 @@
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:gem/rbs@3.10.3",
+      "bom-ref": "pkg:gem/rbs@3.10.4",
       "properties": [
         {
           "name": "SrcFile",
@@ -4151,7 +4151,7 @@
         },
         {
           "name": "cdx:gem:gemUri",
-          "value": "https://rubygems.org/gems/rbs-3.10.3.gem"
+          "value": "https://rubygems.org/gems/rbs-3.10.4.gem"
         }
       ]
     },
@@ -6930,7 +6930,7 @@
       "dependsOn": [
         "pkg:gem/fiber-annotation@0.2.0",
         "pkg:gem/fiber-local@1.1.0",
-        "pkg:gem/json@2.19.2"
+        "pkg:gem/json@2.19.3"
       ]
     },
     {
@@ -7064,7 +7064,7 @@
       ]
     },
     {
-      "ref": "pkg:gem/json@2.19.2",
+      "ref": "pkg:gem/json@2.19.3",
       "dependsOn": []
     },
     {
@@ -7246,7 +7246,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:gem/rbs@3.10.3",
+      "ref": "pkg:gem/rbs@3.10.4",
       "dependsOn": [
         "pkg:gem/logger@1.7.0",
         "pkg:gem/tsort@0.2.0"
@@ -7317,7 +7317,7 @@
     {
       "ref": "pkg:gem/rubocop@1.85.1",
       "dependsOn": [
-        "pkg:gem/json@2.19.2",
+        "pkg:gem/json@2.19.3",
         "pkg:gem/language_server-protocol@3.17.0.5",
         "pkg:gem/lint_roller@1.1.0",
         "pkg:gem/mcp@0.9.1",
@@ -7370,7 +7370,7 @@
       "dependsOn": [
         "pkg:gem/language_server-protocol@3.17.0.5",
         "pkg:gem/prism@1.9.0",
-        "pkg:gem/rbs@3.10.3"
+        "pkg:gem/rbs@3.10.4"
       ]
     },
     {
@@ -7402,7 +7402,7 @@
         "pkg:gem/ostruct@0.6.3",
         "pkg:gem/parser@3.3.10.2",
         "pkg:gem/prism@1.9.0",
-        "pkg:gem/rbs@3.10.3",
+        "pkg:gem/rbs@3.10.4",
         "pkg:gem/reverse_markdown@3.0.2",
         "pkg:gem/rubocop@1.85.1",
         "pkg:gem/thor@1.5.0",
@@ -7603,7 +7603,7 @@
         "pkg:gem/fuubar@2.5.1",
         "pkg:gem/ice_nine@0.11.2",
         "pkg:gem/irb@1.8.1",
-        "pkg:gem/json@2.19.2",
+        "pkg:gem/json@2.19.3",
         "pkg:gem/lint_roller@1.1.0",
         "pkg:gem/m@1.6.1",
         "pkg:gem/minitest@5.18.0",
